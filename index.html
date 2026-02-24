@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>SmartFactory — Topologie Multi-Site</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: #060a12;
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: #cbd5e1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  svg {
+    width: 100%;
+    height: 100vh;
+    min-height: 800px;
+  }
+
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* Pulse animation for active nodes */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes dash {
+    to { stroke-dashoffset: -20; }
+  }
+  @keyframes dash-reverse {
+    to { stroke-dashoffset: 20; }
+  }
+
+  .vpn-line { animation: dash 1.5s linear infinite; }
+  .vpn-line-rev { animation: dash-reverse 1.5s linear infinite; }
+  .cloud-line { animation: dash 2s linear infinite; }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+  .pulse-slow { animation: pulse 3s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 1500 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+<defs>
+  <!-- Gradients -->
+  <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#060a12"/>
+    <stop offset="100%" stop-color="#08111f"/>
+  </linearGradient>
+
+  <linearGradient id="hub-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#0f1e3d"/>
+    <stop offset="100%" stop-color="#0a1628"/>
+  </linearGradient>
+
+  <linearGradient id="usine-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#0a1a10"/>
+    <stop offset="100%" stop-color="#071510"/>
+  </linearGradient>
+
+  <linearGradient id="cloud-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#04111e"/>
+    <stop offset="100%" stop-color="#061624"/>
+  </linearGradient>
+
+  <linearGradient id="fw-active-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#7f1d1d"/>
+    <stop offset="100%" stop-color="#450a0a"/>
+  </linearGradient>
+
+  <linearGradient id="fw-passive-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#3b1a00"/>
+    <stop offset="100%" stop-color="#1c0d00"/>
+  </linearGradient>
+
+  <linearGradient id="switch-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#1e1b4b"/>
+    <stop offset="100%" stop-color="#0e0c2a"/>
+  </linearGradient>
+
+  <linearGradient id="access-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#0f2e1a"/>
+    <stop offset="100%" stop-color="#071a0e"/>
+  </linearGradient>
+
+  <!-- Markers / Arrows -->
+  <marker id="arr-vpn" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+  </marker>
+  <marker id="arr-cloud" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#38bdf8"/>
+  </marker>
+  <marker id="arr-internal" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/>
+  </marker>
+  <marker id="arr-green" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#4ade80"/>
+  </marker>
+  <marker id="arr-red" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/>
+  </marker>
+
+  <!-- Filters -->
+  <filter id="glow-blue" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow-green" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow-orange" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.5"/>
+  </filter>
+</defs>
+
+<!-- ==================== BACKGROUND ==================== -->
+<rect width="1500" height="900" fill="url(#bg-grad)"/>
+
+<!-- Subtle grid -->
+<g opacity="0.04" stroke="#4080ff" stroke-width="0.5">
+  <line x1="0" y1="100" x2="1500" y2="100"/>
+  <line x1="0" y1="200" x2="1500" y2="200"/>
+  <line x1="0" y1="300" x2="1500" y2="300"/>
+  <line x1="0" y1="400" x2="1500" y2="400"/>
+  <line x1="0" y1="500" x2="1500" y2="500"/>
+  <line x1="0" y1="600" x2="1500" y2="600"/>
+  <line x1="0" y1="700" x2="1500" y2="700"/>
+  <line x1="0" y1="800" x2="1500" y2="800"/>
+  <line x1="150" y1="0" x2="150" y2="900"/>
+  <line x1="300" y1="0" x2="300" y2="900"/>
+  <line x1="450" y1="0" x2="450" y2="900"/>
+  <line x1="600" y1="0" x2="600" y2="900"/>
+  <line x1="750" y1="0" x2="750" y2="900"/>
+  <line x1="900" y1="0" x2="900" y2="900"/>
+  <line x1="1050" y1="0" x2="1050" y2="900"/>
+  <line x1="1200" y1="0" x2="1200" y2="900"/>
+  <line x1="1350" y1="0" x2="1350" y2="900"/>
+</g>
+
+<!-- ==================== HEADER ==================== -->
+<rect x="20" y="12" width="1460" height="44" rx="8" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+<rect x="20" y="12" width="6" height="44" rx="3" fill="#3b82f6"/>
+<text x="42" y="32" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="16" fill="#f1f5f9">SmartFactory</text>
+<text x="42" y="48" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#475569">ARCHITECTURE RÉSEAU — TOPOLOGIE MULTI-SITE SD-WAN · GRAND-EST · 4 SITES · 800 EMP.</text>
+<!-- Badges -->
+<rect x="1150" y="20" width="110" height="28" rx="5" fill="#0f2233" stroke="#0284c7" stroke-width="1"/>
+<text x="1205" y="38" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#38bdf8">SD-WAN ACTIF</text>
+<rect x="1270" y="20" width="130" height="28" rx="5" fill="#1c1400" stroke="#f59e0b" stroke-width="1"/>
+<text x="1335" y="38" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#fbbf24">VPN IPSec AES-256</text>
+<rect x="1410" y="20" width="60" height="28" rx="5" fill="#0f172a" stroke="#1e3a5f" stroke-width="1"/>
+<text x="1440" y="38" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#64748b">FÉV 2026</text>
+
+<!-- ==================== LEGEND ==================== -->
+<rect x="20" y="65" width="1460" height="28" rx="5" fill="#080e1a" stroke="#0f1e3a" stroke-width="1"/>
+<!-- items -->
+<rect x="35" y="75" width="10" height="10" rx="2" fill="#dc2626"/>
+<text x="50" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">Firewall NGFW</text>
+<rect x="165" y="75" width="10" height="10" rx="2" fill="#4338ca"/>
+<text x="180" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">Switch Core</text>
+<rect x="280" y="75" width="10" height="10" rx="2" fill="#15803d"/>
+<text x="295" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">Switch Accès</text>
+<rect x="400" y="75" width="10" height="10" rx="2" fill="#6366f1"/>
+<text x="415" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">WiFi 6E</text>
+<rect x="490" y="75" width="10" height="10" rx="2" fill="#7c3aed"/>
+<text x="505" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">OT/PLC</text>
+<rect x="570" y="75" width="10" height="10" rx="2" fill="#65a30d"/>
+<text x="585" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">Edge GW</text>
+<!-- line types -->
+<line x1="680" y1="80" x2="720" y2="80" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,3"/>
+<text x="725" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">VPN IPSec HUB</text>
+<line x1="870" y1="80" x2="910" y2="80" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="3,3"/>
+<text x="915" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">Internet direct → Cloud</text>
+<line x1="1090" y1="80" x2="1130" y2="80" stroke="#60a5fa" stroke-width="1.5"/>
+<text x="1135" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">Lien interne</text>
+<line x1="1240" y1="80" x2="1280" y2="80" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="2,2"/>
+<text x="1285" y="84" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#94a3b8">IoT → Azure</text>
+
+
+<!-- ===========================================================
+     CLOUD AZURE — TOP CENTER
+     =========================================================== -->
+<g id="cloud-azure">
+  <!-- Cloud background -->
+  <rect x="530" y="100" width="440" height="145" rx="14" fill="url(#cloud-grad)" stroke="#0369a1" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="530" y="100" width="440" height="4" rx="2" fill="#0284c7" opacity="0.6"/>
+  <!-- Title -->
+  <text x="545" y="122" font-family="'IBM Plex Mono', monospace" font-weight="600" font-size="11" fill="#38bdf8">☁  AZURE CLOUD — France Central</text>
+  <text x="545" y="136" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#334155">SLA 99,99% · Résidence données France · Geo-redondé</text>
+
+  <!-- Cloud services grid -->
+  <!-- Entra ID -->
+  <rect x="542" y="143" width="96" height="46" rx="6" fill="#0c1e38" stroke="#1d4ed8" stroke-width="1"/>
+  <text x="590" y="161" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#93c5fd">🆔 Entra ID</text>
+  <text x="590" y="174" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3b82f6">IAM · MFA · SSO</text>
+  <text x="590" y="184" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#1e40af">Conditional Access</text>
+
+  <!-- M365 -->
+  <rect x="646" y="143" width="96" height="46" rx="6" fill="#0c1e38" stroke="#1d4ed8" stroke-width="1"/>
+  <text x="694" y="161" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#93c5fd">📧 M365 BP</text>
+  <text x="694" y="174" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3b82f6">Teams · Exchange</text>
+  <text x="694" y="184" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#1e40af">SharePoint · Intune</text>
+
+  <!-- IoT Hub -->
+  <rect x="750" y="143" width="96" height="46" rx="6" fill="#0c1e38" stroke="#0284c7" stroke-width="1"/>
+  <text x="798" y="161" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#7dd3fc">🏭 IoT Hub S3</text>
+  <text x="798" y="174" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#0ea5e9">300M msg/jour</text>
+  <text x="798" y="184" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#0369a1">Stream Analytics</text>
+
+  <!-- Blob Storage -->
+  <rect x="854" y="143" width="104" height="46" rx="6" fill="#0c1e38" stroke="#0284c7" stroke-width="1"/>
+  <text x="906" y="161" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#7dd3fc">💾 Blob Storage</text>
+  <text x="906" y="174" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#0ea5e9">Immutable 90j</text>
+  <text x="906" y="184" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#0369a1">4-3-2-1-0</text>
+</g>
+
+
+<!-- ===========================================================
+     HUB — STRASBOURG (center)
+     =========================================================== -->
+<g id="hub-strasbourg">
+  <rect x="530" y="290" width="440" height="530" rx="14" fill="url(#hub-grad)" stroke="#1d4ed8" stroke-width="2" filter="url(#shadow)"/>
+  <!-- Top accent bar -->
+  <rect x="530" y="290" width="440" height="5" rx="2" fill="#2563eb"/>
+  <!-- Title bar -->
+  <rect x="530" y="295" width="440" height="36" rx="0" fill="#0f1f40"/>
+  <text x="548" y="310" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="13" fill="#f1f5f9">🏢  HUB — Strasbourg</text>
+  <text x="548" y="323" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#475569">SIÈGE SOCIAL · DG · R&amp;D · COMPTABILITÉ · DATACENTER</text>
+  <rect x="880" y="301" width="80" height="18" rx="9" fill="#172554" stroke="#3b82f6" stroke-width="1"/>
+  <text x="920" y="314" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#60a5fa">300 emp. 🔴</text>
+
+  <!-- === WAN SECTION === -->
+  <text x="548" y="353" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#334155">── ARRIVÉES INTERNET (DUAL WAN FTTO)</text>
+  <!-- Eurafibre -->
+  <rect x="542" y="360" width="198" height="36" rx="6" fill="#0c1e38" stroke="#1d4ed8" stroke-width="1"/>
+  <circle cx="558" cy="378" r="6" fill="#22c55e" class="pulse"/>
+  <text x="572" y="374" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#93c5fd">Eurafibre — PRINCIPAL</text>
+  <text x="572" y="387" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#1d4ed8">1 Gbps symétrique · FTTO · P0</text>
+  <!-- Orange -->
+  <rect x="750" y="360" width="208" height="36" rx="6" fill="#0c1e38" stroke="#1d4ed8" stroke-width="1"/>
+  <circle cx="766" cy="378" r="6" fill="#22c55e"/>
+  <text x="780" y="374" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#93c5fd">Orange/SFR — BACKUP</text>
+  <text x="780" y="387" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#1d4ed8">500 Mbps · Load-balance · P1</text>
+
+  <!-- === FIREWALL HA === -->
+  <text x="548" y="418" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#334155">── SÉCURITÉ PÉRIMÉTRIQUE — CLUSTER HAUTE DISPONIBILITÉ</text>
+  <rect x="542" y="424" width="416" height="64" rx="8" fill="#1a0606" stroke="#dc2626" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="560" y="438" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#dc2626">CLUSTER HA ACTIF/PASSIF</text>
+  <!-- FW Active -->
+  <rect x="550" y="442" width="185" height="38" rx="6" fill="url(#fw-active-grad)" stroke="#dc2626" stroke-width="1.5"/>
+  <circle cx="568" cy="455" r="4" fill="#ef4444" class="pulse"/>
+  <text x="580" y="456" font-family="'IBM Plex Mono', monospace" font-weight="600" font-size="11" fill="#fca5a5">PA-1410 ● ACTIF</text>
+  <text x="580" y="468" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#7f1d1d">9.5 Gbps SSL · App-ID · IPS/IDS</text>
+  <text x="549" y="476" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#dc2626">               Inspection applicative L7</text>
+  <!-- HA Sync arrow -->
+  <line x1="735" y1="461" x2="755" y2="461" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="742" y="458" font-family="'IBM Plex Mono', monospace" font-size="7" fill="#f59e0b">SYNC</text>
+  <!-- FW Passive -->
+  <rect x="757" y="442" width="193" height="38" rx="6" fill="url(#fw-passive-grad)" stroke="#92400e" stroke-width="1"/>
+  <circle cx="775" cy="455" r="4" fill="#f59e0b"/>
+  <text x="787" y="456" font-family="'IBM Plex Mono', monospace" font-size="11" fill="#fcd34d">PA-1410 ○ PASSIF</text>
+  <text x="787" y="468" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#78350f">Standby · Failover &lt; 1 sec</text>
+
+  <!-- === CORE SWITCHES === -->
+  <text x="548" y="508" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#334155">── CŒUR DE RÉSEAU — STACKWISE VIRTUAL</text>
+  <rect x="542" y="514" width="416" height="58" rx="8" fill="#0a0a24" stroke="#4338ca" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="560" y="528" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6366f1">CHASSIS VIRTUEL 100G · MEC · ZERO STP</text>
+  <rect x="550" y="532" width="190" height="32" rx="5" fill="url(#switch-grad)" stroke="#4338ca" stroke-width="1.5"/>
+  <text x="645" y="545" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#a5b4fc">⚡ Catalyst 9500 #1</text>
+  <text x="645" y="558" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3730a3">40/100G uplinks</text>
+  <line x1="740" y1="548" x2="758" y2="548" stroke="#818cf8" stroke-width="1.5"/>
+  <rect x="758" y="532" width="192" height="32" rx="5" fill="url(#switch-grad)" stroke="#4338ca" stroke-width="1.5"/>
+  <text x="854" y="545" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#a5b4fc">⚡ Catalyst 9500 #2</text>
+  <text x="854" y="558" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3730a3">480 Gbps backplane</text>
+
+  <!-- === ACCESS LAYER === -->
+  <text x="548" y="593" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#334155">── DISTRIBUTION &amp; ACCÈS — ZONES A / B</text>
+  <rect x="542" y="598" width="198" height="36" rx="6" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="641" y="612" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#86efac">🔌 9300L Zone A</text>
+  <text x="641" y="625" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#14532d">Bureaux · PoE+ · ZTP</text>
+  <rect x="750" y="598" width="208" height="36" rx="6" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="854" y="612" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#86efac">🔌 9300L Zone B</text>
+  <text x="854" y="625" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#14532d">Production · PoE+ · ZTP</text>
+
+  <!-- === END DEVICES === -->
+  <text x="548" y="655" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#334155">── TERMINAUX SIÈGE</text>
+  <rect x="542" y="660" width="96" height="34" rx="5" fill="#120b2e" stroke="#6366f1" stroke-width="1"/>
+  <text x="590" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#a5b4fc">📶 WiFi 6E</text>
+  <text x="590" y="686" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#4338ca">10 × C9120AXI</text>
+
+  <rect x="646" y="660" width="96" height="34" rx="5" fill="#120b2e" stroke="#7c3aed" stroke-width="1"/>
+  <text x="694" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#c4b5fd">🤖 Robots/OT</text>
+  <text x="694" y="686" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#5b21b6">VLAN 30</text>
+
+  <rect x="750" y="660" width="96" height="34" rx="5" fill="#0e1822" stroke="#0284c7" stroke-width="1"/>
+  <text x="798" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#7dd3fc">📺 LiveTV</text>
+  <text x="798" y="686" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#075985">VLAN Invités</text>
+
+  <rect x="854" y="660" width="104" height="34" rx="5" fill="#120618" stroke="#c026d3" stroke-width="1"/>
+  <text x="906" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#f0abfc">🔍 Wazuh SIEM</text>
+  <text x="906" y="686" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#86198f">Logs 4 sites</text>
+
+  <!-- === ONPREM SECURITY === -->
+  <text x="548" y="715" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#334155">── SÉCURITÉ &amp; SUPERVISION ON-PREMISE</text>
+  <rect x="542" y="720" width="104" height="34" rx="5" fill="#0a1408" stroke="#16a34a" stroke-width="1"/>
+  <text x="594" y="734" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#86efac">🎫 GLPI ITSM</text>
+  <text x="594" y="746" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#14532d">Helpdesk · CMDB</text>
+
+  <rect x="654" y="720" width="104" height="34" rx="5" fill="#160808" stroke="#ea580c" stroke-width="1"/>
+  <text x="706" y="734" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fb923c">🔐 PAM360</text>
+  <text x="706" y="746" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#7c2d12">Bastion · JIT · RDP</text>
+
+  <rect x="766" y="720" width="104" height="34" rx="5" fill="#0a0e18" stroke="#334155" stroke-width="1"/>
+  <text x="818" y="734" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#94a3b8">📡 PRTG</text>
+  <text x="818" y="746" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#334155">Network Monitor</text>
+
+  <rect x="878" y="720" width="80" height="34" rx="5" fill="#0a0e18" stroke="#334155" stroke-width="1"/>
+  <text x="918" y="734" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#94a3b8">💾 NAS</text>
+  <text x="918" y="746" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#334155">Veeam · LTO-9</text>
+
+  <!-- === VPN CONCENTRATOR label === -->
+  <rect x="542" y="772" width="416" height="26" rx="5" fill="#0c1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="750" y="782" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#334155">── HUB VPN · CONCENTRATEUR IPSec ── POINT D'ENTRÉE TOUTES USINES</text>
+  <text x="750" y="792" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#1d4ed8">Palo Alto Panorama · Gestion centralisée des politiques · 6 PA-440 sites</text>
+</g>
+
+
+<!-- ===========================================================
+     USINES — LEFT COLUMN
+     =========================================================== -->
+
+<!-- ─── USINE 1 : WOLFISHEIM ─── -->
+<g id="usine-wolfisheim">
+  <rect x="22" y="150" width="285" height="330" rx="12" fill="url(#usine-grad)" stroke="#15803d" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="22" y="150" width="285" height="4" rx="2" fill="#16a34a"/>
+  <rect x="22" y="154" width="285" height="30" rx="0" fill="#0a1a10"/>
+  <text x="36" y="168" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="12" fill="#f1f5f9">🏭 Wolfisheim</text>
+  <text x="36" y="180" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">USINE PILOTE · IoT DENSE · 200 emp.</text>
+  <rect x="248" y="160" width="50" height="16" rx="8" fill="#0f2e1a" stroke="#16a34a" stroke-width="1"/>
+  <text x="273" y="172" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#4ade80">VLAN 30/40</text>
+
+  <!-- FW HA -->
+  <text x="34" y="203" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">── FW CLUSTER HA (fanless)</text>
+  <rect x="30" y="208" width="130" height="30" rx="5" fill="url(#fw-active-grad)" stroke="#dc2626" stroke-width="1.5"/>
+  <circle cx="46" cy="223" r="4" fill="#ef4444" class="pulse"/>
+  <text x="57" y="220" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fca5a5">PA-440 ACTIF</text>
+  <text x="57" y="232" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#7f1d1d">HA Sync · NGFW</text>
+  <rect x="168" y="208" width="128" height="30" rx="5" fill="url(#fw-passive-grad)" stroke="#92400e" stroke-width="1"/>
+  <circle cx="182" cy="223" r="4" fill="#f59e0b"/>
+  <text x="194" y="220" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fcd34d">PA-440 PASSIF</text>
+  <text x="194" y="232" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#78350f">Failover &lt; 1s</text>
+
+  <!-- STACK -->
+  <text x="34" y="257" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">── STACKWISE ACCESS</text>
+  <rect x="30" y="262" width="125" height="28" rx="5" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="92" y="273" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#86efac">🔌 9300L Stack 1</text>
+  <text x="92" y="284" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#14532d">OT · PoE+ · ZTP</text>
+  <rect x="163" y="262" width="132" height="28" rx="5" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="229" y="273" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#86efac">🔌 9300L Stack 2</text>
+  <text x="229" y="284" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#14532d">WiFi · Users</text>
+
+  <!-- Terminaux -->
+  <text x="34" y="308" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">── TERMINAUX OT / IoT</text>
+  <rect x="30" y="313" width="82" height="28" rx="5" fill="#1a0f2e" stroke="#7c3aed" stroke-width="1"/>
+  <text x="71" y="325" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#c4b5fd">⚙️ PLCs</text>
+  <text x="71" y="335" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#5b21b6">VLAN 30</text>
+  <rect x="120" y="313" width="80" height="28" rx="5" fill="#120b2e" stroke="#6366f1" stroke-width="1"/>
+  <text x="160" y="325" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#a5b4fc">📶 WiFi 6E</text>
+  <text x="160" y="335" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#4338ca">VLAN 50</text>
+  <rect x="208" y="313" width="87" height="28" rx="5" fill="#0e1c08" stroke="#65a30d" stroke-width="1"/>
+  <text x="251" y="325" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#a3e635">💻 Edge GW</text>
+  <text x="251" y="335" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#3f6212">7j buffer</text>
+
+  <!-- IoT capteurs -->
+  <rect x="30" y="349" width="265" height="26" rx="5" fill="#04111e" stroke="#0284c7" stroke-width="1"/>
+  <text x="162" y="360" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#7dd3fc">🌡 200+ Capteurs IoT · MQTT TLS 8883 · VLAN 40</text>
+  <text x="162" y="369" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#0369a1">Température · Vibrations · TRS · Conso. électrique</text>
+
+  <!-- SD-WAN local badge -->
+  <rect x="30" y="384" width="265" height="24" rx="5" fill="#1c1400" stroke="#f59e0b" stroke-width="1"/>
+  <text x="162" y="392" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#fbbf24">SD-WAN · Internet direct local + VPN HUB</text>
+  <text x="162" y="402" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#92400e">Breakout M365/Azure direct · Trafic interne → Hub</text>
+  <text x="162" y="414" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7" fill="#78350f">QoS EF(46) VoIP · AF31 ERP · BE Internet</text>
+</g>
+
+<!-- ─── USINE 2 : LINGOLSHEIM ─── -->
+<g id="usine-lingolsheim">
+  <rect x="22" y="498" width="285" height="235" rx="12" fill="url(#usine-grad)" stroke="#15803d" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="22" y="498" width="285" height="4" rx="2" fill="#16a34a"/>
+  <rect x="22" y="502" width="285" height="30" rx="0" fill="#0a1a10"/>
+  <text x="36" y="516" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="12" fill="#f1f5f9">🏭 Lingolsheim</text>
+  <text x="36" y="528" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">LOGISTIQUE · MOBILITÉ WiFi VITALE · 150 emp.</text>
+
+  <text x="34" y="551" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">── FW CLUSTER HA</text>
+  <rect x="30" y="556" width="128" height="28" rx="5" fill="url(#fw-active-grad)" stroke="#dc2626" stroke-width="1.5"/>
+  <circle cx="46" cy="570" r="4" fill="#ef4444" class="pulse"/>
+  <text x="57" y="567" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fca5a5">PA-440 ACTIF</text>
+  <text x="57" y="578" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#7f1d1d">HA Sync</text>
+  <rect x="166" y="556" width="128" height="28" rx="5" fill="url(#fw-passive-grad)" stroke="#92400e" stroke-width="1"/>
+  <text x="177" y="567" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fcd34d">PA-440 PASSIF</text>
+  <text x="177" y="578" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#78350f">Failover &lt; 1s</text>
+
+  <text x="34" y="603" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">── STACKWISE ACCESS</text>
+  <rect x="30" y="608" width="128" height="26" rx="5" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="94" y="619" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#86efac">🔌 9300L Stack 1</text>
+  <text x="94" y="629" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#14532d">Logistique · AGV</text>
+  <rect x="166" y="608" width="128" height="26" rx="5" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="230" y="619" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#86efac">🔌 9300L Stack 2</text>
+  <text x="230" y="629" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#14532d">WiFi Dense · Scan</text>
+
+  <text x="34" y="653" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">── TERMINAUX</text>
+  <rect x="30" y="658" width="82" height="26" rx="5" fill="#1a0f2e" stroke="#7c3aed" stroke-width="1"/>
+  <text x="71" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#c4b5fd">⚙️ PLCs</text>
+  <rect x="120" y="658" width="82" height="26" rx="5" fill="#120b2e" stroke="#6366f1" stroke-width="1"/>
+  <text x="161" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#a5b4fc">📶 WiFi 6E</text>
+  <rect x="210" y="658" width="85" height="26" rx="5" fill="#0e1c08" stroke="#65a30d" stroke-width="1"/>
+  <text x="252" y="674" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#a3e635">💻 Edge GW</text>
+
+  <rect x="30" y="693" width="265" height="24" rx="5" fill="#1c1400" stroke="#f59e0b" stroke-width="1"/>
+  <text x="162" y="701" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#fbbf24">SD-WAN · Internet direct local + VPN HUB</text>
+  <text x="162" y="711" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#92400e">M365/Azure breakout direct · Interne → Hub</text>
+</g>
+
+<!-- ─── USINE 3 : MITTELHAUSBERGEN ─── -->
+<g id="usine-mittel">
+  <rect x="22" y="748" width="285" height="132" rx="12" fill="url(#usine-grad)" stroke="#15803d" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="22" y="748" width="285" height="4" rx="2" fill="#16a34a"/>
+  <rect x="22" y="752" width="285" height="30" rx="0" fill="#0a1a10"/>
+  <text x="36" y="766" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="11" fill="#f1f5f9">🏭 Mittelhausbergen</text>
+  <text x="36" y="778" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#374151">PRODUCTION · FLUX CAO · 150 emp.</text>
+
+  <rect x="30" y="793" width="128" height="26" rx="5" fill="url(#fw-active-grad)" stroke="#dc2626" stroke-width="1.5"/>
+  <circle cx="46" cy="806" r="4" fill="#ef4444" class="pulse"/>
+  <text x="57" y="803" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fca5a5">PA-440 ACTIF</text>
+  <text x="57" y="813" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#7f1d1d">HA · NGFW</text>
+  <rect x="166" y="793" width="128" height="26" rx="5" fill="url(#fw-passive-grad)" stroke="#92400e" stroke-width="1"/>
+  <text x="177" y="803" font-family="'IBM Plex Mono', monospace" font-size="9.5" fill="#fcd34d">PA-440 PASSIF</text>
+  <text x="177" y="813" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#78350f">Failover &lt;1s</text>
+
+  <rect x="30" y="827" width="82" height="24" rx="5" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="71" y="843" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#86efac">9300L S1</text>
+  <rect x="120" y="827" width="82" height="24" rx="5" fill="url(#access-grad)" stroke="#15803d" stroke-width="1.5"/>
+  <text x="161" y="843" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#86efac">9300L S2</text>
+  <rect x="210" y="827" width="85" height="24" rx="5" fill="#0e1c08" stroke="#65a30d" stroke-width="1"/>
+  <text x="252" y="843" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#a3e635">💻 Edge GW</text>
+
+  <rect x="30" y="859" width="265" height="16" rx="4" fill="#1c1400" stroke="#f59e0b" stroke-width="0.5"/>
+  <text x="162" y="871" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#f59e0b">SD-WAN · Direct Cloud + VPN HUB · CAO Strasbourg</text>
+</g>
+
+
+<!-- ===========================================================
+     CONNECTIONS / FLOWS
+     =========================================================== -->
+
+<!-- === CLOUD connections from HUB (top) === -->
+<!-- Hub → Cloud (Entra ID, M365) — double arrow up -->
+<line x1="680" y1="290" x2="680" y2="248" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3" class="cloud-line" marker-end="url(#arr-cloud)"/>
+<line x1="700" y1="248" x2="700" y2="290" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4,3" opacity="0.4" marker-end="url(#arr-cloud)"/>
+<rect x="706" y="262" width="48" height="14" rx="3" fill="#04111e" stroke="#0284c7" stroke-width="0.5"/>
+<text x="730" y="272" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#38bdf8">Azure HTTPS</text>
+
+<!-- Hub → Cloud IoT Hub -->
+<line x1="820" y1="290" x2="820" y2="248" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3" class="cloud-line" marker-end="url(#arr-cloud)"/>
+
+<!-- === VPN IPSec — USINES → HUB === -->
+
+<!-- Wolfisheim → Hub (VPN principal) -->
+<path d="M 307 280 C 410 280 450 400 530 460" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,4" fill="none" class="vpn-line" marker-end="url(#arr-vpn)"/>
+<path d="M 530 470 C 450 420 410 310 307 295" stroke="#f59e0b" stroke-width="1" stroke-dasharray="7,4" fill="none" class="vpn-line-rev" opacity="0.4"/>
+<!-- VPN label -->
+<rect x="370" y="358" width="90" height="22" rx="11" fill="#1c1400" stroke="#f59e0b" stroke-width="1"/>
+<text x="415" y="367" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#fbbf24">VPN IPSec</text>
+<text x="415" y="376" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7" fill="#92400e">AES-256 · QoS</text>
+
+<!-- Lingolsheim → Hub -->
+<path d="M 307 580 C 400 580 460 550 530 550" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,4" fill="none" class="vpn-line" marker-end="url(#arr-vpn)"/>
+<path d="M 530 560 C 460 560 400 590 307 590" stroke="#f59e0b" stroke-width="1" stroke-dasharray="7,4" fill="none" class="vpn-line-rev" opacity="0.4"/>
+<rect x="375" y="557" width="90" height="16" rx="8" fill="#1c1400" stroke="#f59e0b" stroke-width="1"/>
+<text x="420" y="569" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#fbbf24">VPN IPSec</text>
+
+<!-- Mittelhausbergen → Hub -->
+<path d="M 307 810 C 380 810 450 730 530 680" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,4" fill="none" class="vpn-line" marker-end="url(#arr-vpn)"/>
+<path d="M 530 690 C 450 740 380 820 307 820" stroke="#f59e0b" stroke-width="1" stroke-dasharray="7,4" fill="none" class="vpn-line-rev" opacity="0.4"/>
+<rect x="368" y="736" width="90" height="16" rx="8" fill="#1c1400" stroke="#f59e0b" stroke-width="1"/>
+<text x="413" y="748" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#fbbf24">VPN IPSec</text>
+
+<!-- === DIRECT INTERNET → CLOUD from each USINE (breakout) === -->
+<!-- Internet access arrow from Wolfisheim to cloud (Internet local) -->
+<path d="M 164 150 C 164 130 350 120 542 152" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="3,4" fill="none" class="cloud-line" marker-end="url(#arr-cloud)" opacity="0.7"/>
+<rect x="195" y="122" width="130" height="18" rx="5" fill="#04111e" stroke="#0284c7" stroke-width="0.5"/>
+<text x="260" y="131" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#38bdf8">M365 / Azure direct</text>
+<text x="260" y="140" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7" fill="#0369a1">(SD-WAN breakout local)</text>
+
+<!-- Lingolsheim to cloud -->
+<path d="M 164 498 C 164 130 350 115 542 148" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3,4" fill="none" class="cloud-line" opacity="0.5" marker-end="url(#arr-cloud)"/>
+
+<!-- Mittelhausbergen to cloud -->
+<path d="M 164 748 C 164 130 360 110 542 144" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3,4" fill="none" class="cloud-line" opacity="0.35" marker-end="url(#arr-cloud)"/>
+
+<!-- === IoT EDGE → Azure IoT Hub (right side to cloud) === -->
+<!-- Wolfisheim edge → IoT Hub -->
+<path d="M 295 335 C 340 335 350 190 750 190" stroke="#4ade80" stroke-width="1.2" stroke-dasharray="3,4" fill="none" class="cloud-line" opacity="0.6" marker-end="url(#arr-green)"/>
+<rect x="320" y="298" width="70" height="16" rx="4" fill="#071a0e" stroke="#16a34a" stroke-width="0.5"/>
+<text x="355" y="310" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="7.5" fill="#4ade80">IoT MQTT/TLS</text>
+
+<!-- === HUB internal connections visual cues === -->
+<!-- WAN → FW -->
+<line x1="641" y1="396" x2="641" y2="424" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr-internal)"/>
+<line x1="854" y1="396" x2="854" y2="424" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr-internal)"/>
+<!-- FW → Core -->
+<line x1="750" y1="488" x2="750" y2="514" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr-internal)"/>
+<!-- Core → Access -->
+<line x1="641" y1="572" x2="641" y2="598" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr-internal)"/>
+<line x1="854" y1="572" x2="854" y2="598" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr-internal)"/>
+<!-- Access → Terminaux -->
+<line x1="590" y1="634" x2="590" y2="660" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+<line x1="694" y1="634" x2="694" y2="660" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+<line x1="798" y1="634" x2="798" y2="660" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+<line x1="906" y1="634" x2="906" y2="660" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+
+<!-- === USINE internal FW → Stack → Terminaux connections (Wolfisheim) === -->
+<line x1="94" y1="238" x2="94" y2="262" stroke="#60a5fa" stroke-width="1" marker-end="url(#arr-internal)"/>
+<line x1="229" y1="238" x2="229" y2="262" stroke="#60a5fa" stroke-width="1" marker-end="url(#arr-internal)"/>
+<line x1="92" y1="290" x2="71" y2="313" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+<line x1="160" y1="290" x2="160" y2="313" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+<line x1="229" y1="290" x2="251" y2="313" stroke="#4ade80" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arr-green)"/>
+
+
+<!-- ===========================================================
+     FLOW ANNOTATIONS (right side)
+     =========================================================== -->
+<g id="annotations">
+  <rect x="1192" y="150" width="286" height="660" rx="12" fill="#06080f" stroke="#1e293b" stroke-width="1"/>
+  <rect x="1192" y="150" width="286" height="4" rx="2" fill="#334155"/>
+  <text x="1335" y="172" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#64748b">── FLUX &amp; POLITIQUE SD-WAN ──</text>
+
+  <!-- QoS table -->
+  <rect x="1202" y="180" width="266" height="18" rx="3" fill="#0f172a" stroke="#1e3a5f" stroke-width="0.5"/>
+  <text x="1210" y="193" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3b82f6">TRAFIC</text>
+  <text x="1295" y="193" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3b82f6">DSCP</text>
+  <text x="1345" y="193" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3b82f6">LIEN</text>
+  <text x="1418" y="193" font-family="'IBM Plex Mono', monospace" font-size="8.5" fill="#3b82f6">FAILOVER</text>
+
+  <!-- rows -->
+  <g font-family="'IBM Plex Mono', monospace" font-size="8">
+    <rect x="1202" y="200" width="266" height="16" rx="2" fill="#0a1628" stroke="#1e3a5f" stroke-width="0.3"/>
+    <text x="1210" y="211" fill="#fca5a5">VoIP/Teams RT</text>
+    <text x="1295" y="211" fill="#f59e0b">EF(46)</text>
+    <text x="1345" y="211" fill="#4ade80">Eurafibre P0</text>
+    <text x="1418" y="211" fill="#94a3b8">Orange</text>
+
+    <rect x="1202" y="217" width="266" height="16" rx="2" fill="#060a12"/>
+    <text x="1210" y="228" fill="#fca5a5">ERP Sylob</text>
+    <text x="1295" y="228" fill="#f59e0b">AF31(26)</text>
+    <text x="1345" y="228" fill="#4ade80">Eurafibre P1</text>
+    <text x="1418" y="228" fill="#94a3b8">&lt;1s</text>
+
+    <rect x="1202" y="234" width="266" height="16" rx="2" fill="#0a1628" stroke="#1e3a5f" stroke-width="0.3"/>
+    <text x="1210" y="245" fill="#fca5a5">M365 / Cloud</text>
+    <text x="1295" y="245" fill="#f59e0b">AF21(18)</text>
+    <text x="1345" y="245" fill="#4ade80">Direct local</text>
+    <text x="1418" y="245" fill="#94a3b8">LB</text>
+
+    <rect x="1202" y="251" width="266" height="16" rx="2" fill="#060a12"/>
+    <text x="1210" y="262" fill="#94a3b8">Internet std</text>
+    <text x="1295" y="262" fill="#64748b">BE(0)</text>
+    <text x="1345" y="262" fill="#64748b">Load-balance</text>
+    <text x="1418" y="262" fill="#64748b">LB</text>
+
+    <rect x="1202" y="268" width="266" height="16" rx="2" fill="#0a1628" stroke="#1e3a5f" stroke-width="0.3"/>
+    <text x="1210" y="279" fill="#a3e635">IoT MQTT</text>
+    <text x="1295" y="279" fill="#4ade80">TLS 8883</text>
+    <text x="1345" y="279" fill="#38bdf8">Direct Azure</text>
+    <text x="1418" y="279" fill="#4ade80">Edge buf.</text>
+  </g>
+
+  <!-- Divider -->
+  <line x1="1202" y1="296" x2="1468" y2="296" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- VLAN Table -->
+  <text x="1335" y="314" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#64748b">── SEGMENTATION VLAN ──</text>
+  <g font-family="'IBM Plex Mono', monospace" font-size="8">
+    <!-- headers -->
+    <rect x="1202" y="318" width="266" height="16" rx="2" fill="#0f172a" stroke="#1e3a5f" stroke-width="0.5"/>
+    <text x="1210" y="329" fill="#3b82f6">VLAN</text>
+    <text x="1253" y="329" fill="#3b82f6">NOM</text>
+    <text x="1325" y="329" fill="#3b82f6">ZONE FW</text>
+    <text x="1406" y="329" fill="#3b82f6">QoS</text>
+
+    <rect x="1202" y="335" width="266" height="14" rx="1" fill="#0a1628"/>
+    <text x="1210" y="346" fill="#a5b4fc">10</text><text x="1253" y="346" fill="#94a3b8">Management</text><text x="1325" y="346" fill="#4ade80">Trusted</text><text x="1406" y="346" fill="#fbbf24">P1 Crit.</text>
+
+    <rect x="1202" y="350" width="266" height="14" rx="1" fill="#060a12"/>
+    <text x="1210" y="361" fill="#a5b4fc">20</text><text x="1253" y="361" fill="#94a3b8">Bureaux Cadres</text><text x="1325" y="361" fill="#4ade80">Trusted</text><text x="1406" y="361" fill="#60a5fa">P2 Haute</text>
+
+    <rect x="1202" y="365" width="266" height="14" rx="1" fill="#0a1628"/>
+    <text x="1210" y="376" fill="#f87171">30</text><text x="1253" y="376" fill="#94a3b8">Production OT</text><text x="1325" y="376" fill="#f87171">OT Zone</text><text x="1406" y="376" fill="#fbbf24">P1 Crit.</text>
+
+    <rect x="1202" y="380" width="266" height="14" rx="1" fill="#060a12"/>
+    <text x="1210" y="391" fill="#7dd3fc">40</text><text x="1253" y="391" fill="#94a3b8">IoT Capteurs</text><text x="1325" y="391" fill="#7dd3fc">IoT Zone</text><text x="1406" y="391" fill="#94a3b8">P3 Normal</text>
+
+    <rect x="1202" y="395" width="266" height="14" rx="1" fill="#0a1628"/>
+    <text x="1210" y="406" fill="#a5b4fc">50</text><text x="1253" y="406" fill="#94a3b8">WiFi Employés</text><text x="1325" y="406" fill="#4ade80">Trusted</text><text x="1406" y="406" fill="#60a5fa">P2 Haute</text>
+
+    <rect x="1202" y="410" width="266" height="14" rx="1" fill="#060a12"/>
+    <text x="1210" y="421" fill="#94a3b8">60</text><text x="1253" y="421" fill="#94a3b8">WiFi Invités</text><text x="1325" y="421" fill="#475569">Guest</text><text x="1406" y="421" fill="#475569">P4 BE</text>
+
+    <rect x="1202" y="425" width="266" height="14" rx="1" fill="#0a1628"/>
+    <text x="1210" y="436" fill="#a5b4fc">70</text><text x="1253" y="436" fill="#94a3b8">Serveurs IT</text><text x="1325" y="436" fill="#4ade80">Trusted</text><text x="1406" y="436" fill="#fbbf24">P1 Crit.</text>
+  </g>
+
+  <!-- Divider -->
+  <line x1="1202" y1="450" x2="1468" y2="450" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- Matrice flux -->
+  <text x="1335" y="466" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#64748b">── MATRICE DE FLUX FW ──</text>
+  <g font-family="'IBM Plex Mono', monospace" font-size="7.5">
+    <rect x="1202" y="470" width="266" height="16" rx="2" fill="#0f172a" stroke="#1e3a5f" stroke-width="0.5"/>
+    <text x="1210" y="481" fill="#3b82f6">SRC → DEST</text>
+    <text x="1305" y="481" fill="#3b82f6">Trusted</text>
+    <text x="1360" y="481" fill="#3b82f6">OT</text>
+    <text x="1400" y="481" fill="#3b82f6">IoT</text>
+    <text x="1440" y="481" fill="#3b82f6">Internet</text>
+
+    <rect x="1202" y="487" width="266" height="13" rx="1" fill="#0a1628"/>
+    <text x="1210" y="497" fill="#4ade80">Trusted</text>
+    <text x="1305" y="497" fill="#22c55e">✓ OK</text>
+    <text x="1360" y="497" fill="#f59e0b">⚠ Restr.</text>
+    <text x="1400" y="497" fill="#ef4444">✗</text>
+    <text x="1440" y="497" fill="#22c55e">✓</text>
+
+    <rect x="1202" y="501" width="266" height="13" rx="1" fill="#060a12"/>
+    <text x="1210" y="511" fill="#f87171">OT (Prod.)</text>
+    <text x="1305" y="511" fill="#f59e0b">⚠ Restr.</text>
+    <text x="1360" y="511" fill="#22c55e">✓ OK</text>
+    <text x="1400" y="511" fill="#7dd3fc">Telém.</text>
+    <text x="1440" y="511" fill="#ef4444">✗</text>
+
+    <rect x="1202" y="515" width="266" height="13" rx="1" fill="#0a1628"/>
+    <text x="1210" y="525" fill="#7dd3fc">IoT</text>
+    <text x="1305" y="525" fill="#ef4444">✗</text>
+    <text x="1360" y="525" fill="#ef4444">✗</text>
+    <text x="1400" y="525" fill="#22c55e">✓ OK</text>
+    <text x="1440" y="525" fill="#38bdf8">Azure↑</text>
+
+    <rect x="1202" y="529" width="266" height="13" rx="1" fill="#060a12"/>
+    <text x="1210" y="539" fill="#475569">Guest</text>
+    <text x="1305" y="539" fill="#ef4444">✗</text>
+    <text x="1360" y="539" fill="#ef4444">✗</text>
+    <text x="1400" y="539" fill="#ef4444">✗</text>
+    <text x="1440" y="539" fill="#22c55e">Web↑</text>
+  </g>
+
+  <!-- Divider -->
+  <line x1="1202" y1="555" x2="1468" y2="555" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- PCA snippet -->
+  <text x="1335" y="573" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#64748b">── RÉSILIENCE PCA ──</text>
+  <g font-family="'IBM Plex Mono', monospace" font-size="8">
+    <rect x="1202" y="578" width="266" height="130" rx="6" fill="#06080f" stroke="#1e293b" stroke-width="0.5"/>
+    <text x="1210" y="593" fill="#f59e0b">► WAN fail  </text><text x="1285" y="593" fill="#4ade80">SD-WAN &lt;1s</text>
+    <text x="1210" y="608" fill="#f59e0b">► 2x WAN fail</text><text x="1285" y="608" fill="#f59e0b">4G LTE &lt;5min</text>
+    <text x="1210" y="623" fill="#f59e0b">► Entra ID ↓ </text><text x="1285" y="623" fill="#f59e0b">Cache 1h</text>
+    <text x="1210" y="638" fill="#f59e0b">► ERP Sylob ↓</text><text x="1285" y="638" fill="#ea580c">Papier + ressaisie</text>
+    <text x="1210" y="653" fill="#ef4444">► Ransomware  </text><text x="1285" y="653" fill="#4ade80">Veeam &lt;4h</text>
+    <text x="1210" y="668" fill="#ef4444">► Incendie STG</text><text x="1285" y="668" fill="#4ade80">Azure &lt;8h</text>
+    <text x="1210" y="683" fill="#22c55e">► PLC usine   </text><text x="1285" y="683" fill="#22c55e">Autonome ∞</text>
+    <text x="1210" y="698" fill="#22c55e">► IoT offline  </text><text x="1285" y="698" fill="#22c55e">Edge buf. 7j</text>
+  </g>
+
+  <!-- Sauvegarde -->
+  <text x="1335" y="726" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#64748b">── SAUVEGARDE 4-3-2-1-0 ──</text>
+  <g font-family="'IBM Plex Mono', monospace" font-size="7.5">
+    <rect x="1202" y="730" width="266" height="70" rx="5" fill="#06080f" stroke="#1e293b" stroke-width="0.5"/>
+    <text x="1210" y="744" fill="#4ade80">4</text><text x="1222" y="744" fill="#94a3b8">copies: NAS + Azure FR + Azure EU + LTO-9</text>
+    <text x="1210" y="757" fill="#4ade80">3</text><text x="1222" y="757" fill="#94a3b8">supports: HDD RAID6 · Cloud · Bande Mag.</text>
+    <text x="1210" y="770" fill="#4ade80">2</text><text x="1222" y="770" fill="#94a3b8">sites: France Central + Europe North</text>
+    <text x="1210" y="783" fill="#4ade80">1</text><text x="1222" y="783" fill="#94a3b8">air-gap: LTO-9 coffre-fort hors-ligne</text>
+    <text x="1210" y="796" fill="#22c55e">0</text><text x="1222" y="796" fill="#94a3b8">erreur: SureBackup quotidien automatisé</text>
+  </g>
+</g>
+
+
+<!-- FOOTER -->
+<rect x="20" y="858" width="1460" height="32" rx="6" fill="#060a12" stroke="#0f1e3a" stroke-width="1"/>
+<text x="30" y="874" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#1e3a5f">SmartFactory — Architecture Multi-Site SD-WAN · Hub Strasbourg (1) + Spokes Usines (3) · Palo Alto PA-1410/PA-440 · Cisco Catalyst 9500/9300L · WiFi 6E C9120AXI · Azure Cloud</text>
+<text x="1400" y="874" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#1e3a5f">Fév. 2026 v2</text>
+
+</svg>
+</body>
+</html>
